@@ -1,0 +1,127 @@
+// Copyright 2020 Nash Muhandes
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. The name of the author may not be used to endorse or promote products
+//    derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+// OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+// IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+//===========================================================================
+//
+//
+//
+//===========================================================================
+
+class GYPHandler : EventHandler
+{
+	const PARTY_DISTANCE = 200.0;
+
+	Array<Line> savedLines;
+
+	override void WorldLoaded(WorldEvent e)
+	{
+	}
+
+	override void WorldTick(void)
+	{
+		// restore the exit lines
+		for (int i = 0; i < savedLines.Size(); i++)
+		{
+			if (savedLines[i] && savedLines[i].special == 0)
+			{
+				savedLines[i].special = Teleport_NewMap;
+			}
+		}
+	}
+
+	override void WorldLinePreActivated(WorldEvent e)
+	{
+		if (e.Thing is "PlayerPawn")
+		{
+			// check if you triggered an exit line
+			if (e.ActivationType == SPAC_Cross || e.ActivationType == SPAC_Use)
+			{
+				if (e.ActivatedLine.special == Teleport_NewMap)
+				{
+					// save this line for later
+					if (savedLines.Find(e.ActivatedLine) == savedLines.Size())
+					{
+						savedLines.Push(e.ActivatedLine);
+					}
+
+					// don't allow exit if you're not gathered
+					if (!PartyGathered())
+					{
+						// temporarily clear the special
+						e.ActivatedLine.special = 0;
+
+						if (players[consoleplayer].mo == e.Thing)
+						{
+							Console.MidPrint(SmallFont, StringTable.Localize("$GYP_MUSTGATHERPARTY"));
+							S_StartSound("misc/chat", CHAN_VOICE, CHANF_MAYBE_LOCAL | CHANF_UI, 1, ATTN_NONE);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//===========================================================================
+	//
+	//
+	//
+	//===========================================================================
+
+	bool PartyGathered(void)
+	{
+		bool result = true;
+
+		for (int i = 0; i < MAXPLAYERS; i++)
+		{
+			if (playeringame[i] && result == true)
+			{
+				let pmo = players[i].mo;
+				if (pmo)
+				{
+					ThinkerIterator it = ThinkerIterator.Create("PlayerPawn");
+					Actor pmo_other;
+					while (pmo_other = Actor(it.Next()))
+					{
+						if (pmo_other != pmo && pmo_other is "PlayerPawn")
+						{
+							if (pmo.Distance3D(pmo_other) > PARTY_DISTANCE)
+							{
+								result = false;
+								break;
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		return result;
+	}
+}

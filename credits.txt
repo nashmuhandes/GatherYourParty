@@ -1,0 +1,8 @@
+Gather Your Party
+Written by Nash Muhandes
+(C) 2020 Nash Muhandes
+
+You may freely use this in your projects without asking me for permission.
+
+All I ask for is a mention in your credits. This file, and all source headers
+must remain intact.
