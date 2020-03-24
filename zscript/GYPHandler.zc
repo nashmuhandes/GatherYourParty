@@ -48,6 +48,12 @@ class GYPHandler : EventHandler
 			if (savedLines[i] && savedLines[i].special == 0)
 			{
 				savedLines[i].special = Teleport_NewMap;
+
+				// remove the blocking flag if it was set
+				if (savedLines[i].flags & Line.ML_BLOCKING)
+				{
+					savedLines[i].flags &= ~Line.ML_BLOCKING;
+				}
 			}
 		}
 	}
@@ -73,6 +79,22 @@ class GYPHandler : EventHandler
 						// temporarily clear the special
 						e.ActivatedLine.special = 0;
 
+						// temporarily set to blocking
+						e.ActivatedLine.flags |= Line.ML_BLOCKING;
+
+						// push the player back
+						double ang = atan2(e.ActivatedLine.delta.Y, e.ActivatedLine.delta.X) + 90;
+						ang += 180.0;
+
+						let frontTex = e.ActivatedLine.sidedef[Line.front].GetTexture(Side.mid);
+						let backTex = e.ActivatedLine.sidedef[Line.back].GetTexture(Side.mid);
+
+						// if only the back texture is available, assume the line direction is reversed
+						if (backTex && !frontTex) ang += 180.0;
+
+						e.Thing.Vel.XY = (0, 0);
+						e.Thing.Thrust(7.8125, ang);
+
 						if (players[consoleplayer].mo == e.Thing)
 						{
 							Console.MidPrint(SmallFont, StringTable.Localize("$GYP_MUSTGATHERPARTY"));
@@ -92,36 +114,53 @@ class GYPHandler : EventHandler
 
 	bool PartyGathered(void)
 	{
-		bool result = true;
+		bool gathered = true;
 
+		Array<PlayerPawn> allPlayers;
+		allPlayers.Clear();
+
+		// store all online players in the array
 		for (int i = 0; i < MAXPLAYERS; i++)
 		{
-			if (playeringame[i] && result == true)
+			if (playeringame[i])
 			{
 				let pmo = players[i].mo;
 				if (pmo)
 				{
-					ThinkerIterator it = ThinkerIterator.Create("PlayerPawn");
-					Actor pmo_other;
-					while (pmo_other = Actor(it.Next()))
-					{
-						if (pmo_other != pmo && pmo_other is "PlayerPawn")
-						{
-							if (pmo.Distance3D(pmo_other) > PARTY_DISTANCE)
-							{
-								result = false;
-								break;
-							}
-						}
-					}
+					allPlayers.Push(pmo);
+					//Console.Printf("%s added into allPlayers", pmo.player.GetUserName());
 				}
-			}
-			else
-			{
-				break;
 			}
 		}
 
-		return result;
+		// check distance between each player
+		// if even one player fails the distance check, consider party not gathered
+		for (int i = 0; i < allPlayers.Size(); i++)
+		{
+			let currentPlayer = allPlayers[i];
+
+			// check the next player, but the last player must check against the first player
+			let otherPlayer = i < (allPlayers.Size() - 1) ? allPlayers[i + 1] : allPlayers[0];
+
+			if (currentPlayer && otherPlayer)
+			{
+				//Console.Printf("%s is checking against %s...", currentPlayer.player.GetUserName(), otherPlayer.player.GetUserName());
+
+				// too far! abort the search
+				if (currentPlayer.Distance3D(otherPlayer) > PARTY_DISTANCE)
+				{
+					//Console.Printf("%s is too far from %s", currentPlayer.player.GetUserName(), otherPlayer.player.GetUserName());
+					gathered = false;
+					break;
+				}
+				else
+				{
+					//Console.Printf("%s is close to %s", currentPlayer.player.GetUserName(), otherPlayer.player.GetUserName());
+					continue;
+				}
+			}
+		}
+
+		return gathered;
 	}
 }
